@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>打飞机游戏</title>
+		<style type="text/css">
+			#game{border: 1px solid red;display: block;margin: 0 auto;}
+		</style>
+	</head>
+	<body>
+		<canvas id="game" width="" height="">你的浏览器不支持canvas</canvas>
+		<audio class = "game_music" loop="loop" src="">你的浏览器不支持audio</audio>
+		<audio src="audio/game_over.mp3"  class="over">你的浏览器不支持audio</audio>
+		<audio src="" class="enemy">你的浏览器不支持audio</audio>
+		<audio src="audio/bullet.mp3" class="bullet">你的浏览器不支持audio</audio>
+	</body>
+	<script>
+		//对象  主机 敌机 子弹  
+		//方法  画  动 
+		//碰撞  主机碰撞敌机  子弹碰撞敌机  （像素碰撞：性能问题 选做）
+		//玩法、声音 （选做）
+		var game_music = document.getElementsByClassName("game_music")[0];
+		var over = document.getElementsByClassName("over")[0];
+		var enemymusic = document.getElementsByClassName("enemy")[0];
+		var bulletmusic = document.getElementsByClassName("bullet")[0];
+		var direction ={}; // 控制hero战机方向的数组
+		var flySpeed = 5;  //飞机的移动速度
+		var bulletSpeed = 4; // 控制子弹的速度
+		var bulletTime = 0;  // 控制生成子弹的频率
+		var welfares = [];
+		var bulletClass = "one";
+		var imgArr = {//预加载
+			"bg":"img/background.png",
+			"herofly":"img/herofly.png",
+			"bullet2":"img/bullet2.png",
+			"bomb":"img/bomb.png",
+			"bullet1":"img/bullet1.png",
+			"enemy1":"img/enemy1.png",
+			"enemy2":"img/enemy2.png",
+			"enemy3":"img/enemy3.png",
+			"prop":"img/prop.png"
+		};
+		var imgLength = 0;
+		for(var i in imgArr){
+			imgLength ++;
+		}
+		var num = 0;
+		var loodArr = {};
+		for(let i in imgArr){
+			var img = new Image();
+			img.src = imgArr[i];
+			img.onload = function(){
+				num++;
+				loodArr[i] = this;
+				if(num >= imgLength){
+					main(loodArr); // 图片加载之后调用的函数
+				}
+			}
+		}
+		function main(loodArr){
+			game_music.src = "audio/game_music.mp3";
+			game_music.play();
+			var canvas = document.getElementById("game");
+			var context = canvas.getContext("2d");
+			canvas.width = loodArr.bg.width;
+			canvas.height = loodArr.bg.height;
+			function Hreo(x,y,blood,obj){//主机对象
+				this.x = x;
+				this.y = y;
+				this.blood = blood;
+				this.obj = obj;
+				this.w = obj.width/5;
+				this.h  =  obj.height;
+				this.index = 0;  // 控制爆炸效果雪碧图的索引值
+				this.boom  = 0;
+				this.close = true;
+				this.isLife = true;
+				this.life = 3;
+			}
+			Hreo.prototype.draw = function(){
+				if(this.blood<=0){  // 飞机爆炸了的判断条件
+					this.boom++;
+					if(this.boom%15 ==0){  // 控制爆炸的控件
+						this.index++;
+					}
+				}
+				if(this.life >0 && this.index > 4){  // 剩余生命条数大于零，切上一次的爆炸动画执行完毕了
+					this.life--;
+					this.blood = 100;
+					this.boom = 0;
+					this.index = 0;	
+				}
+				if(this.life == 0 && this.index >= 4){
+					this.isLife = false;
+				}
+				context.drawImage(this.obj,this.index*this.w,0,this.w,this.h,this.x,this.y,this.w,this.h); // 切学雪碧图
+			}
+			Hreo.prototype.to = function(){ //控制飞机的方向
+				document.onkeydown = function(ev){
+					var e = window.event || ev;
+					if(e.keyCode == 37 || e.keyCode == 38 ){
+						direction = {};
+						direction[e.keyCode] = e.keyCode;
+					}
+					if( e.keyCode == 39 || e.keyCode == 40){
+						direction = {};
+						direction[e.keyCode] = e.keyCode;
+					}
+				}
+				document.onkeyup = function(ev){
+					var e = window.event || ev;
+					if(e.keyCode == 37 || e.keyCode == 38 || e.keyCode == 39 || e.keyCode == 40){
+						direction = {};
+					}
+				}
+			}
+			function Bullet(x,y,power,obj,speed){//子弹构造函数
+				this.x = x;
+				this.y = y;
+				this.power = power;
+				this.obj = obj;
+				this.w = obj.width;
+				this.h = obj.height;
+				this.speed = speed;
+			}
+			Bullet.prototype.draw = function(){
+				context.drawImage(this.obj,this.x,this.y);
+			}
+			Bullet.prototype.move = function(){
+				this.y -= this.speed;
+			}
+			Bullet.prototype.isClear = function(){  //子弹超出屏幕就清除
+				if(this.y < 0){
+					return true;
+				}else{
+					return false;
+				}
+			}
+			//敌机的构造函数
+			function Enemy(x,y,blood,obj,speed,index,enemyClass){
+				this.x = x;
+				this.y = y;
+				this.obj = obj;
+				this.speed = speed;
+				this.w =  obj.width/index;
+				this.h = obj.height;
+				this.blood = blood;
+				this.index = 0;
+				this.boom = 0;
+				this.isBoom = false; 
+				this.close = false; // 是否爆炸完毕，爆炸完毕从存放敌机的容器中清除敌机
+				this.allIndx = index;  //爆炸效果总的下标数
+				this.enemyClass = enemyClass;  //敌机的类型  爆炸的时候控制不同的音效
+				this.music = true;  // 控制背景音乐只播放一次的开关
+			}
+			Enemy.prototype.draw = function(){
+				if(this.blood<=0){
+					this.boom++;
+					this.isBoom = true;
+					if(this.boom%5 ==0){  // 控制爆炸的控件
+						this.index++;
+					}
+					if(this.index >=this.allIndx){
+						this.close = true;
+					}
+					if(this.music){
+						this.music = false;
+						enemymusic.src = "audio/"+ this.enemyClass+"_down.mp3";
+						enemymusic.play();
+					}
+				}
+				context.drawImage(this.obj,this.index*this.w,0,this.w,this.h,this.x,this.y,this.w,this.h);
+			}
+			Enemy.prototype.move = function(){
+				this.y += this.speed;
+			}
+			var x = 120;  // 飞机初始位置的X坐标
+			var y = canvas.height-82;  //飞机初始位置的Y坐标
+			var newhero = new Hreo(x,y,100,loodArr.herofly);  //实例化英雄飞机
+			newhero.to();
+			var bullet = [];//存放子弹的容器
+			var enemy = [];//存放怪兽的容器
+			var y=0; // 背景滚动
+			function draw(y){
+				context.beginPath();
+				context.drawImage(loodArr.bg,0,y);
+				context.drawImage(loodArr.bg,0,-canvas.height+y);
+			}
+			function Welfare(x,y,obj,speed,index){
+				this.x = x;
+				this.y = y;
+				this.w = obj.width/3;
+				this.h = obj.height;
+				this.obj = obj;
+				this.speed = speed;  
+				this.index = index;
+				this.speedx = 5;
+			}
+			Welfare.prototype.draw = function(){
+				context.drawImage(this.obj,this.index*this.w,0,this.w,this.h,this.x,this.y,this.w,this.h);
+			}
+			Welfare.prototype.move = function(){
+				this.y += this.speed;
+				this.x += this.speedx;   // 福利左右飘动的效果
+				if(this.x > canvas.width - this.w || this.x < 0){  
+					this.speedx *= -1;
+				}
+			}
+			 act();
+			function act(){//动画的函数
+				for(var i in direction){
+						if(direction[i] ==37){
+						newhero.x-=flySpeed;
+						}
+						if(direction[i] ==38){
+							newhero.y-=flySpeed;
+						}
+						if(direction[i] ==39){
+							newhero.x+=flySpeed;
+						}
+						if(direction[i] ==40){
+							newhero.y+=flySpeed;
+						}
+					}
+					if(newhero.x<0){
+							newhero.x = 0;
+						}
+					if(newhero.x>canvas.width-newhero.w){
+						newhero.x = canvas.width-newhero.w;
+					}
+					if(newhero.y<0){
+						newhero.y = 0;
+					}
+					if(newhero.y > canvas.height-newhero.h){
+						newhero.y = canvas.height-newhero.h;
+					}
+				context.clearRect(0,0,canvas.width,canvas.height); //清空画布
+				draw(y);  //画背景图
+				text(newhero.life);  // 显示生命剩余几条
+				y++;
+				if(y>canvas.height){
+					y=0;
+				}
+				bulletTime++;
+				if(bulletTime%200 == 0){
+					var welfareData = randWelfare();
+					var newWelfare = new Welfare(randNumber(0,canvas.width-loodArr.prop.width),0,loodArr.prop,welfareData[1],welfareData[0])
+					welfares.push(newWelfare)
+				}
+				for(var i=0;i<welfares.length;i++){	// 是否吃到东西
+					welfares[i].draw();
+					welfares[i].move();
+					var welfareCrash = isCrash(welfares[i],newhero);
+					if(welfareCrash && newhero.close){
+						if(welfares[i].index ==1){  // 吃到双弹
+							bulletClass = "two";
+						}
+						if(welfares[i].index == 0){   //吃到炸弹
+							for(var j=0;j<enemy.length;j++){
+								enemy[j].blood = 0;
+							}
+						}
+						if(welfares[i].index ==2 && newhero.isLife){  // 吃到生命就加一条名
+								newhero.life ++;
+						}
+						welfares.splice(i,1);
+					}
+				}
+				if(newhero.isLife){  // 飞机正常存在就画飞机发射子弹
+					newhero.draw();  // 画主机
+					if(bulletTime%20 ==0){
+						if(bulletClass =="one"){  // 单发的子弹
+							var newBullet = new Bullet(newhero.x+32,newhero.y+10,2,loodArr.bullet1,bulletSpeed)//实例化子弹
+							bullet.push(newBullet); // 将子弹放到盛放子弹的容器里
+							bulletmusic.play();  // 播放发射子弹的声音
+						}
+						if(bulletClass =="two"){  // 双发的子弹
+							var newBullet = new Bullet(newhero.x+10,newhero.y+10,2,loodArr.bullet2,bulletSpeed)//实例化子弹
+							bullet.push(newBullet); // 将子弹放到盛放子弹的容器里
+							bulletmusic.play();  // 播放发射子弹的声音
+						}
+					}
+					for(var i=0;i<bullet.length;i++){
+						bullet[i].draw(); //画子弹
+						bullet[i].move(); //子弹移动
+						if(bullet[i].isClear()){
+							bullet.splice(i,1);//清除子弹
+						}
+					}
+				}
+				if(newhero.index >=4 && newhero.life ==0 ){  // 爆炸之后再把飞机取消
+					game_music.pause();  // 停止游戏声音
+					newhero.close = false;  // 盘算是不是连残害都不剩了
+				}
+				if(bulletTime%60 == 0){  // 多久生成一个飞机
+					var randEnemy = randEnemys();	//随机一个种类的敌机
+					var newEnemy = new Enemy(randNumber(-loodArr[randEnemy[0]].width/randEnemy[1]/2,canvas.width+loodArr[randEnemy[0]].width/randEnemy[1]/2),0,randEnemy[2],loodArr[randEnemy[0]],randEnemy[3],randEnemy[1],randEnemy[0]);
+					enemy.push(newEnemy);
+				}
+				for(var i=0;i<enemy.length;i++){
+					enemy[i].draw() // 画敌机
+					enemy[i].move() //敌机移动
+					if(enemy[i].isBoom){
+						enemy[i].speed = 0;
+					}
+					for(var j=0;j<bullet.length;j++){//检测像素碰撞 敌机与子弹的碰撞
+						var crash = isCrash(enemy[i],bullet[j]);  // 判断敌机是否与子弹相撞
+						if(crash && newhero.close){   // 英雄战机活着并且普通碰撞才检测像素碰撞
+							context.clearRect(0,0,canvas.width,canvas.height)//清空画布
+							enemy[i].draw();   //画当前碰撞的敌机
+							var imgData1 =  context.getImageData(crash.rect.x,crash.rect.y,crash.rect.w,Math.ceil(crash.rect.h)); 	//获取敌机的像素数据
+							context.clearRect(0,0,canvas.width,canvas.height);//清空画布
+							bullet[j].draw();   // 画碰撞的子弹
+							var imgData2 = context.getImageData(crash.rect.x,crash.rect.y,crash.rect.w,Math.ceil(crash.rect.h)); //获取子弹的像素数据	
+							context.clearRect(0,0,canvas.width,canvas.height);//清空画布
+							draw(y);  //画背景图
+							newhero.draw();  // 画主机
+							for(var k=0;k<bullet.length;k++){
+									bullet[k].draw(); //画子弹
+							}
+							for(var k=0;k<enemy.length;k++){
+									enemy[k].draw(); //画敌机
+							}
+							text(newhero.life);  // 显示生命剩余几条
+							for(var k=0;k<imgData2.data.length;k+=4){
+								if(imgData2.data[k+3] > 0 && imgData1.data[k+3] > 0 ){
+//									console.log("碰撞了");
+									bullet.splice(j,1);
+									enemy[i].blood -= 30;
+									break;
+								}
+							}
+						}
+					}
+					var heroCrash = isCrash(enemy[i],newhero);  //判断敌机是否与战机碰撞
+					if(heroCrash && newhero.close){		
+						context.clearRect(0,0,canvas.width,canvas.height);//清空画布
+						newhero.draw();  // 画主机
+						var imgData2 = context.getImageData(heroCrash.rect.x,heroCrash.rect.y,heroCrash.rect.w,Math.ceil(heroCrash.rect.h)); //获取hero的像素数据
+						context.clearRect(0,0,canvas.width,canvas.height)//清空画布
+						enemy[i].draw();   //画当前碰撞的敌机
+						var imgData1 =  context.getImageData(heroCrash.rect.x,heroCrash.rect.y,heroCrash.rect.w,Math.ceil(heroCrash.rect.h)); 	//获取敌机的像素数据
+						context.clearRect(0,0,canvas.width,canvas.height);//清空画布
+						draw(y);  //画背景图
+						for(var k=0;k<bullet.length;k++){
+							bullet[k].draw(); //画子弹
+						}
+						for(var k=0;k<enemy.length;k++){
+							enemy[k].draw(); //画敌机
+						}
+						newhero.draw();  // 画主机
+						text(newhero.life);  // 显示生命剩余几条
+						for(var k=0;k<imgData2.data.length;k+=4){
+							if(imgData2.data[k+3] > 0 && imgData1.data[k+3] > 0 ){
+//								console.log("碰撞了");
+								newhero.blood = 0;
+								over.play();  // 播放死亡声音
+								break;
+							}
+						}
+					}
+					if(enemy[i].close || enemy[i].y>canvas.height){  // 敌机炸了就从容器中去清除掉  或者超出下边界
+						enemy.splice(i,1);
+					}
+				}
+				window.requestAnimationFrame(act);  // 回调动画
+			}
+			function text(num){
+				context.beginPath();
+				context.textBaseline  = "middle";
+				context.textAlign = "center";
+				context.fillStyle = "#000000";
+				context.font = "bold 20px Arial"; // 设置字的大小必须给字体
+				context.fillText("生命 ："+num+"",100,30);
+			}
+		}
+		function randNumber(min,max){  //随机数函数
+			return parseInt(Math.random()*(max-min) + min);
+		}
+		function randEnemys(){ //随机出现敌机的类别的函数
+			var arr = [["enemy1",5,50,6],["enemy2",6,100,4],["enemy3",10,150,2]];
+			return arr[randNumber(0,3)];
+		}
+		function randWelfare(){ //随机出现敌机的类别的函数
+			var arr = [[0,2],[1,4],[2,5]];
+			return arr[randNumber(0,3)];
+		}
+		function Rect(x,y,w,h){  // 用于像素碰撞检测
+				this.x = x;
+				this.y = y;
+				this.w = w;
+				this.h = h;
+		}
+		function isCrash(rect1,rect2){//碰撞检测
+			var min1x = 	rect1.x;
+			var max1x = rect1.x + rect1.w;
+			var min2x = rect2.x;
+			var max2x = rect2.x+rect2.w;
+			var min1y = 	rect1.y;
+			var max1y = rect1.y + rect1.h;
+			var min2y = rect2.y;
+			var max2y = rect2.y+rect2.h;
+			//假设碰撞出新的方块：
+			var nminx = Math.max(min1x,min2x);
+			var nmaxx =  Math.min(max1x,max2x);
+			var nminy = Math.max(min1y,min2y);
+			var nmaxy =  Math.min(max1y,max2y);
+			var obj = new Rect(nminx,nminy,(nmaxx-nminx),(nmaxy-nminy));
+			if(nmaxx > nminx && nmaxy > nminy){
+				return {
+						judge:true,
+						rect :obj
+				};
+			}
+		}
+	</script>
+</html>

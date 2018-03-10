@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title></title>
+		<style type="text/css">
+			#canvas{
+				border: 1px solid red;
+			}
+		</style>
+	</head>
+	<body>
+		<canvas id="canvas" width="100" height="40">您的浏览器不支持canvas</canvas>
+	</body>
+	<script>
+		var canvas = document.getElementById("canvas");
+		var arr = [];
+		context = canvas.getContext("2d");
+		//随机字符 透明度  大小 位置随机
+		//随机背景颜色 取浅色  200 - 250  
+ 		//干扰项 ： 10个左右的随机（半径 位置）干扰圆  
+					//10 个左右随机（长度随机，位置随机，大部分在画布上）的干扰线
+		var strStare = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+		//随机的函数
+		function randNumber(min,max){
+			return parseInt((max-min)*Math.random()) + min;
+		}
+			//随机颜色
+//		canvas.style.background = `rgb(${randNumber(200,255)},${randNumber(200,255)},${randNumber(200,255)})`;
+//		var color = `rgb(${randNumber(200,255)},${randNumber(200,255)},${randNumber(200,255)})`;
+//		
+		context.beginPath();
+		context.fillStyle = `rgb(${randNumber(200,255)},${randNumber(200,255)},${randNumber(200,255)})`;
+		context.fillRect(0,0,canvas.width,canvas.height);
+		for(var i=1;i<=5;i++){
+			var str = strStare[randNumber(0,strStare.length)];
+			arr.push(str);
+			context.textBaseline  = "middle";
+			context.textAlign = "center";
+			context.fillStyle =  `rgb(${randNumber(0,200)},${randNumber(0,200)},${randNumber(0,200)})`;
+			context.font = "bold "+randNumber(15,25)+"px Arial"; // 设置字的大小必须给字体
+			context.fillText(str,i*20-10,randNumber(10,30));
+		}
+		for(var i=0;i<3;i++){
+			context.beginPath();
+			context.lineWidth = .5;
+			context.moveTo(randNumber(0,canvas.width),randNumber(0,canvas.height));
+			context.lineTo(randNumber(0,canvas.width),randNumber(0,canvas.height));
+			context.stroke();
+			context.beginPath();
+			context.arc(randNumber(1,100),randNumber(1,10),randNumber(canvas.width,canvas.height),Math.PI*2,0)
+			context.stroke();
+		}
+		console.log(arr);
+	</script>
+</html>

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>贪吃蛇</title>
+		<style type="text/css">
+			#canvas{
+				border: 1px solid red;
+			}
+			a{
+				text-decoration: none;
+				font-size: 30px;
+			}
+		</style>
+	</head>
+	<body>
+		<canvas id="canvas" width="600" height="600">你的浏览器不支持canvas</canvas>
+		<a href="">从新开始</a>
+	</body>
+	<script>
+		//规则
+		// 1.蛇头不能碰壁
+		//2.蛇头不能碰到自身
+		//3.吃到食物增加长度
+		//4.食物随机出现（不能随机在蛇身体上）
+		//操作
+		//1.上 下 左 右 （不能反方向移动）
+		/*变量*/
+			var sun = 15;
+		 	var speed = 0;
+			var food = {}; 
+			var ctrlSpeed = 0 ;
+			var newSnack = {};
+			var judgeFood = true;  //判断失误是否被吃掉
+		 /* */
+		var canvas = document.getElementById("canvas");
+		var context = canvas.getContext("2d");
+		//先定义一个方块的类
+		class Rect {
+			constructor(x,y,color,img){
+				this.x = x;
+				this.y = y;
+				this.color = color;
+				this.img = img
+				this.w = 40;
+				this.h = 40;
+			}
+			draw(){
+				context.beginPath();
+				context.drawImage((imgarr[this.img]),this.x,this.y,this.w,this.h);
+//				context.fillStyle = this.color;
+//				context.fillRect(this.x,this.y,this.w,this.h);
+//				context.strokeRect(this.x,this.y,this.w,this.h);
+			}
+		}
+		//定义一个蛇类
+		 class Snack {
+		 	constructor(){
+		 		this.bodyArr = []; //保存所有单元的数组
+		 		this.dis = "right";  //判断前进方向的属性
+		 		//是否存活
+		 		this.isLife = true;
+		 		for(var i=0;i<4;i++){
+		 			var newRect = new Rect(i*40,0,"black","zzr1");
+//		 			this.bodyArr.push(newRect);
+					this.bodyArr.splice(0,0,newRect);
+		 		}
+		 	}
+		 	draw(){
+		 		for(var i=0;i<this.bodyArr.length;i++){
+//		 			if(i==0){this.bodyArr[i].color = "red"}
+					if(i==0){this.bodyArr[i].img = "zzr2"}
+		 			this.bodyArr[i].draw();
+		 		}
+		 	}
+		 	move(){
+		 		//实例化小方块 （加载蛇头后面的）
+		 		var addRect = new Rect(this.bodyArr[0].x,this.bodyArr[0].y,"black","zzr1");
+		 		//移动蛇头 
+		 		switch(this.dis){
+		 			case "right":
+			 			this.bodyArr[0].x += 40;
+			 			break;
+		 			case "down":
+			 			this.bodyArr[0].y += 40;
+			 			break;
+		 			case "left":
+			 			this.bodyArr[0].x -= 40;
+			 			break;
+		 			default:
+			 			this.bodyArr[0].y -= 40;
+			 			break;
+		 		}
+		 		//碰壁检测
+		 		if(this.bodyArr[0].x<0 || this.bodyArr[0].x>canvas.width-40 || this.bodyArr[0].y<0 || this.bodyArr[0].y>canvas.height-40){
+//		 			console.log("你挂了")
+		 			this.isLife = false;
+		 		}
+		 		//蛇头和自身检测碰撞
+		 		for(var i=3; i<this.bodyArr.length;i++){
+		 			if(this.bodyArr[i].x == this.bodyArr[0].x && this.bodyArr[i].y == this.bodyArr[0].y){
+		 				this.isLife = false;
+		 			}
+		 		}
+		 		//把方块加到蛇头后面
+		 		this.bodyArr.splice(1,0,addRect);
+		 		//判断是否吃到食物
+		 		if(this.bodyArr[0].x == food.x && this.bodyArr[0].y == food.y){
+		 			judgeFood = true;
+		 			ctrlSpeed ++;
+		 			if(ctrlSpeed%8 ==0){
+		 				sun--;
+		 			}
+		 		}else{
+		 			//删除最后一个方块
+		 			this.bodyArr.pop();
+		 		}
+		 	}
+		 }
+		 //两张图的预加载；
+		var imgObj={"zzr1":"123.png","zzr2":"321.png"};
+		//统计对象里面的图片个数
+		var imgNum=0;
+		//遍历对象统计个数，因为对象没有length属性
+		for(var i in imgObj){
+			imgNum++;
+		}
+		var num=0;
+		//定义一个对象用来储存加载好的图片
+		var imgarr={};
+		for(let i in imgObj){
+			var img=new Image();
+			img.src=imgObj[i];
+			img.onload=function(){
+				num++;
+				//在每张图加载完成后放进对象imgarr中
+				imgarr[i]=this;
+				if(num>=imgNum){
+					//所有图片都下载好后将图片都画在canvas上
+					newSnack = new Snack();
+					newSnack.draw();
+					act();
+				}
+			}
+		}
+		document.onkeydown = function(e){
+			var ev = e || window.event;
+			switch(ev.keyCode){
+				case 37:
+					if(newSnack.dis!="right"){
+						newSnack.dis = "left";
+						break;
+					}
+				case 38:
+					if(newSnack.dis!="down"){
+						newSnack.dis = "up";
+						break;
+					}
+				case 39:
+					if(newSnack.dis!="left"){
+						newSnack.dis = "right";
+						break;
+					}
+				case 40 :
+					if(newSnack.dis!="up"){
+						newSnack.dis = "down";
+						break;
+					}
+				default:
+					break;
+			}
+		}
+		function act(){
+			speed ++;
+			if(speed%sun == 0){
+				context.clearRect(0,0,canvas.width,canvas.height);
+				if(judgeFood){
+					food = creatFood();
+					judgeFood = false;
+				}
+				food.draw();
+				newSnack.draw();
+				newSnack.move();
+			}
+			if(newSnack.isLife){
+				window.requestAnimationFrame(act);
+			}
+		}
+		function creatFood(){
+			//食物随机符合条件不while循环，不符合继续while循环
+			var judge = false;
+			while(!judge){
+				var sure = true;
+				var x = randNumber(0,15)*40;
+				var y = randNumber(0,15)*40;
+				for(var i=0;i<newSnack.bodyArr.length;i++){
+					if(newSnack.bodyArr[i].x == x && newSnack.bodyArr[i].y ==y){
+						//不满足条件
+						sure = false;
+						continue;
+					}
+				}
+				if(sure){ //满足条件
+					judge = true;
+				}
+			}
+			var newFood = new Rect(x,y,"green","zzr1");
+			return newFood;
+		}
+		function randNumber(min,max){
+			return parseInt((max-min)*Math.random()) + min;
+		}
+	</script>
+</html>
